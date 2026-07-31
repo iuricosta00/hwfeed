@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>hwfeed // painel de notícias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #14161c;
+    --surface: #1b1e27;
+    --surface-hover: #232732;
+    --border: #2a2e3a;
+    --text: #e8e6df;
+    --muted: #8b90a0;
+    --accent: #c9793f;
+    --accent-dim: #8a5730;
+    --ok: #4fb8a6;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--sans);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- TELA DE LOGIN ---------- */
+  #login-screen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .terminal-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+
+  .terminal-bar {
+    padding: 10px 14px;
+    background: #15171e;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .terminal-bar .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-dim);
+  }
+
+  .terminal-body { padding: 28px 24px 24px; }
+
+  .boot-line {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ok);
+    margin: 0 0 18px;
+    min-height: 16px;
+  }
+  .boot-line::after {
+    content: '▌';
+    animation: blink 1s step-end infinite;
+    margin-left: 2px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    letter-spacing: 0.02em;
+  }
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 22px;
+  }
+
+  label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 14px 0 6px;
+  }
+
+  input[type="email"], input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    background: #12141a;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus { border-color: var(--accent); }
+
+  button {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+  }
+
+  #login-form button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 11px;
+    background: var(--accent);
+    color: #14161c;
+    font-weight: 700;
+    transition: background 0.15s;
+  }
+  #login-form button:hover { background: #d98a4f; }
+  #login-form button:disabled { background: var(--accent-dim); cursor: default; }
+
+  #login-error {
+    margin-top: 14px;
+    font-size: 12.5px;
+    color: #e0664f;
+    font-family: var(--mono);
+    display: none;
+  }
+
+  /* ---------- ÁREA DE NOTÍCIAS ---------- */
+  #app-screen { display: none; flex: 1; flex-direction: column; }
+
+  header {
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(20,22,28,0.85);
+    backdrop-filter: blur(6px);
+    position: sticky;
+    top: 0;
+  }
+
+  .brand {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .brand span { color: var(--accent); }
+
+  #logout-btn {
+    background: transparent;
+    border: 1px solid var(--border) !important;
+    color: var(--muted);
+    padding: 7px 14px;
+  }
+  #logout-btn:hover { color: var(--text); border-color: var(--muted) !important; }
+
+  main {
+    flex: 1;
+    max-width: 760px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+  }
+
+  .feed-status {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .news-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+    transition: background 0.15s;
+  }
+  .news-card:hover { background: var(--surface-hover); }
+
+  .news-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ok);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .news-meta .sep { color: var(--border); }
+
+  .news-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    line-height: 1.35;
+  }
+
+  .news-summary {
+    font-size: 14px;
+    color: #c4c2ba;
+    line-height: 1.55;
+    margin: 0 0 10px;
+  }
+
+  .news-source {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .news-source:hover { text-decoration: underline; }
+
+  .empty-state {
+    font-family: var(--mono);
+    color: var(--muted);
+    font-size: 13px;
+    padding: 40px 0;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+  <!-- TELA DE LOGIN -->
+  <div id="login-screen">
+    <div class="terminal-card">
+      <div class="terminal-bar"><span class="dot"></span> auth://hwfeed</div>
+      <div class="terminal-body">
+        <p class="boot-line" id="boot-line">conectando ao painel...</p>
+        <h1><span>hw</span>feed</h1>
+        <p class="subtitle">Painel de notícias — acesso restrito</p>
+
+        <form id="login-form">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" required autocomplete="username" />
+
+          <label for="password">Senha</label>
+          <input type="password" id="password" required autocomplete="current-password" />
+
+          <button type="submit" id="login-btn">Entrar</button>
+        </form>
+        <p id="login-error"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ÁREA LOGADA -->
+  <div id="app-screen">
+    <header>
+      <div class="brand"><span>hw</span>feed</div>
+      <button id="logout-btn">sair</button>
+    </header>
+    <main>
+      <p class="feed-status" id="feed-status">carregando notícias...</p>
+      <div id="news-list"></div>
+    </main>
+  </div>
+
+<script>
+  // ====== CONFIGURAÇÃO ======
+  // Pegue esses valores em: Supabase > Project Settings > API
+ const SUPABASE_URL = 'https://lcmrdrmmcavrphdobuoj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjbXJkcm1tY2F2cnBoZG9idW9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NTk0OTEsImV4cCI6MjEwMTAzNTQ5MX0.NQMnQ3y3FtEmF7vFSJ62kL4MFPBsWQJ3b2pswn2ZL40';
+  // ===========================
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const loginScreen = document.getElementById('login-screen');
+  const appScreen = document.getElementById('app-screen');
+  const loginForm = document.getElementById('login-form');
+  const loginBtn = document.getElementById('login-btn');
+  const loginError = document.getElementById('login-error');
+  const logoutBtn = document.getElementById('logout-btn');
+  const newsList = document.getElementById('news-list');
+  const feedStatus = document.getElementById('feed-status');
+  const bootLine = document.getElementById('boot-line');
+
+  const bootMessages = ['conectando ao painel...', 'verificando sessão...', 'pronto.'];
+  let bootIndex = 0;
+  const bootInterval = setInterval(() => {
+    bootIndex = (bootIndex + 1) % bootMessages.length;
+    bootLine.textContent = bootMessages[bootIndex];
+  }, 1400);
+
+  function showApp() {
+    loginScreen.style.display = 'none';
+    appScreen.style.display = 'flex';
+    clearInterval(bootInterval);
+    carregarNoticias();
+  }
+
+  function showLogin() {
+    appScreen.style.display = 'none';
+    loginScreen.style.display = 'flex';
+  }
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.style.display = 'none';
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'entrando...';
+
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'Entrar';
+
+    if (error) {
+      loginError.textContent = 'Falha no login: ' + error.message;
+      loginError.style.display = 'block';
+      return;
+    }
+    showApp();
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    showLogin();
+  });
+
+  function formatarData(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) +
+      ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function carregarNoticias() {
+    feedStatus.textContent = 'carregando notícias...';
+    newsList.innerHTML = '';
+
+    const { data, error } = await supabase
+      .from('news_items')
+      .select('*')
+      .order('published_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      feedStatus.textContent = 'erro ao carregar: ' + error.message;
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      feedStatus.textContent = '';
+      newsList.innerHTML = '<div class="empty-state">Nenhuma notícia coletada ainda. O agente roda todo dia às 8h.</div>';
+      return;
+    }
+
+    feedStatus.textContent = `${data.length} notícia(s) — atualizado diariamente às 8h`;
+
+    newsList.innerHTML = data.map((item) => `
+      <div class="news-card">
+        <div class="news-meta">
+          <span>${item.source || 'fonte desconhecida'}</span>
+          <span class="sep">/</span>
+          <span>${formatarData(item.published_at || item.fetched_at)}</span>
+        </div>
+        <h3 class="news-title">${item.title}</h3>
+        <p class="news-summary">${item.summary}</p>
+        <a class="news-source" href="${item.url}" target="_blank" rel="noopener">ver fonte →</a>
+      </div>
+    `).join('');
+  }
+
+  // Verifica se já existe uma sessão ativa ao carregar a página
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      showApp();
+    }
+  });
+</script>
+</body>
+</html>
