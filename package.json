@@ -1,0 +1,17 @@
+{
+  "name": "news-fetch-script",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Coleta notícias via RSS, resume com Groq e grava no Supabase",
+  "main": "fetch-news.mjs",
+  "scripts": {
+    "start": "node fetch-news.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "rss-parser": "^3.13.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
