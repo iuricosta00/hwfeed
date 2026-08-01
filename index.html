@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>hwfeed // painel de notícias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #14161c;
+    --surface: #1b1e27;
+    --surface-hover: #232732;
+    --border: #2a2e3a;
+    --text: #e8e6df;
+    --muted: #8b90a0;
+    --accent: #c9793f;
+    --ok: #4fb8a6;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--sans);
+  }
+  header {
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(20,22,28,0.85);
+    position: sticky;
+    top: 0;
+  }
+  .brand { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+  .brand span { color: var(--accent); }
+  main { max-width: 760px; width: 100%; margin: 0 auto; padding: 28px 20px 60px; }
+  .feed-status { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+  .news-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .news-card:hover { background: var(--surface-hover); }
+  .news-meta {
+    font-family: var(--mono); font-size: 11px; color: var(--ok);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .news-meta .sep { color: var(--border); }
+  .news-title { font-size: 16px; font-weight: 600; margin: 0 0 6px; line-height: 1.35; }
+  .news-summary { font-size: 14px; color: #c4c2ba; line-height: 1.55; margin: 0 0 10px; }
+  .news-source { font-family: var(--mono); font-size: 12px; color: var(--accent); text-decoration: none; }
+  .news-source:hover { text-decoration: underline; }
+  .empty-state { font-family: var(--mono); color: var(--muted); font-size: 13px; padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="brand"><span>hw</span>feed</div>
+  </header>
+  <main>
+    <p class="feed-status" id="feed-status">carregando notícias...</p>
+    <div id="news-list"></div>
+  </main>
+
+<script>
+  // ====== CONFIGURAÇÃO DO PROJETO hwfeed (já criado, não precisa mudar) ======
+  const SUPABASE_URL = 'https://lcmrdrmmcavrphdobuoj.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjbXJkcm1tY2F2cnBoZG9idW9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NTk0OTEsImV4cCI6MjEwMTAzNTQ5MX0.NQMnQ3y3FtEmF7vFSJ62kL4MFPBsWQJ3b2pswn2ZL40';
+  // ============================================================================
+
+  // IMPORTANTE: chamamos de "supabaseClient", NUNCA de "supabase" —
+  // a biblioteca já usa esse nome globalmente e um conflito quebra a página inteira.
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const newsList = document.getElementById('news-list');
+  const feedStatus = document.getElementById('feed-status');
+
+  function formatarData(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) +
+      ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function carregarNoticias() {
+    const { data, error } = await supabaseClient
+      .from('news_items')
+      .select('*')
+      .order('published_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      feedStatus.textContent = 'erro ao carregar: ' + error.message;
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      feedStatus.textContent = '';
+      newsList.innerHTML = '<div class="empty-state">Nenhuma notícia coletada ainda. O agente roda de hora em hora.</div>';
+      return;
+    }
+
+    feedStatus.textContent = `${data.length} notícia(s) — atualizado de hora em hora`;
+
+    newsList.innerHTML = data.map((item) => `
+      <div class="news-card">
+        <div class="news-meta">
+          <span>${item.source || 'fonte desconhecida'}</span>
+          <span class="sep">/</span>
+          <span>${formatarData(item.published_at || item.fetched_at)}</span>
+        </div>
+        <h3 class="news-title">${item.title}</h3>
+        <p class="news-summary">${item.summary}</p>
+        <a class="news-source" href="${item.url}" target="_blank" rel="noopener">ver fonte →</a>
+      </div>
+    `).join('');
+  }
+
+  carregarNoticias();
+</script>
+</body>
+</html>
